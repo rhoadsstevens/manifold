@@ -41,7 +41,9 @@ class SearchResultSerializer < ApplicationSerializer
   end
 
   def parents_for_text_section_child
-    text_section = object.model.text_section
+    text_section = object.model&.text_section
+    return {} unless text_section.present?
+
     {
       text_section: text_section_properties(text_section),
       text: text_properties(text_section&.text),
@@ -52,6 +54,8 @@ class SearchResultSerializer < ApplicationSerializer
   alias parents_for_searchable_node parents_for_text_section_child
 
   def parents_for_project_child
+    return {} unless object.model&.project.present?
+
     {
       project: project_properties(object.model.project)
     }

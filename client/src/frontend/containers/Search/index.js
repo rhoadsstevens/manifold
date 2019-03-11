@@ -31,7 +31,7 @@ class SearchContainer extends PureComponent {
       { label: "Projects", value: "Project" },
       { label: "Resources", value: "Resource" },
       { label: "Texts", value: "Text" },
-      { label: "Full Text", value: "SearchableNode" }
+      { label: "Full Text", value: "TextSection" }
     ];
   }
 

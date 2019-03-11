@@ -3,8 +3,8 @@ import PropTypes from "prop-types";
 import lh from "helpers/linkHandler";
 import { Link } from "react-router-dom";
 
-export default class SearchResultsTypeAnnotation extends PureComponent {
-  static displayName = "Search.Results.Type.SearchableNode";
+export default class SearchResultsTypeTextSection extends PureComponent {
+  static displayName = "Search.Results.Type.TextSection";
 
   static propTypes = {
     result: PropTypes.object,
@@ -20,6 +20,10 @@ export default class SearchResultsTypeAnnotation extends PureComponent {
     const { result } = this.props;
     const searchableNode = result.relationships.model;
     const { project, text, textSection } = result.attributes.parents;
+    if (!project || !text || !textSection) {
+      console.table(result)
+      return null;
+    }
     const url = lh.link("readerSection", text.slug, textSection.id);
 
     return (
