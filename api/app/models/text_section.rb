@@ -31,7 +31,6 @@ class TextSection < ApplicationRecord
   belongs_to :ingestion_source
   # We intentionally do not destroy annotations because we want to handle the orphans.
   has_many :annotations, dependent: :nullify
-  has_many :searchable_nodes, -> { order(position: :asc) }, inverse_of: :text_section
   has_many :resources, through: :annotations
   has_many :resource_collections, through: :annotations
   has_many :text_section_stylesheets, dependent: :destroy
@@ -55,9 +54,7 @@ class TextSection < ApplicationRecord
   validates :kind, inclusion: { in: ALLOWED_KINDS }
 
   # Callbacks
-  after_commit :enqueue_searchable_nodes_generation!, if: :should_generate_searchable_nodes?
   after_commit :adopt_or_orphan_annotations!
-  before_destroy :destroy_searchable_nodes!
 
   # Scopes
   scope :in_texts, lambda { |texts|
@@ -66,13 +63,16 @@ class TextSection < ApplicationRecord
 
   # Search
   searchkick(
-    # callbacks: :async,
-    # batch_size: 500,
+    callbacks: :async,
+    batch_size: 500,
     merge_mappings: true,
     mappings: {
       text_section: {
         properties: {
-          text_nodes: { type: "nested" }
+          text_nodes: {
+            type: "nested",
+            properties: { content: { type: "string" } }
+          }
         }
       }
     }
@@ -95,7 +95,7 @@ class TextSection < ApplicationRecord
       project_id: text.project_id,
       text_title: text.title,
       creator_names: text&.makers&.map(&:full_name),
-      text_nodes: properties_for_searchable_nodes
+      text_nodes: properties_for_text_nodes
     }.merge(search_hidden)
   end
 
@@ -123,16 +123,8 @@ class TextSection < ApplicationRecord
     name
   end
 
-  def enqueue_searchable_nodes_generation!
-    # TextSectionJobs::GenerateSearchableNodesJob.perform_later id
-  end
-
-  def generate_searchable_nodes!
-    # TextSectionJobs::GenerateSearchableNodesJob.perform_now id
-  end
-
   # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-  def properties_for_searchable_nodes
+  def properties_for_text_nodes
     inline = Serializer::Html::INLINE_ELEMENTS
     *, nodes = text_nodes.reverse.inject([false, []]) do |(once_more, nodes), node|
       next [once_more, nodes] if node["content"].strip.blank?
@@ -182,32 +174,7 @@ class TextSection < ApplicationRecord
     text_nodes[text_nodes.index(start_node)..text_nodes.index(end_node)]
   end
 
-  class << self
-    def generate_searchable_nodes!(logger = Rails.logger, async = true)
-      count = TextSection.count
-      iteration = 1
-      TextSection.find_each do |text_section|
-        msg = "Committing searchable text nodes for text section"
-        logger.info "#{msg} #{text_section.id}: #{iteration}/#{count}"
-        text_section.enqueue_searchable_nodes_generation! if async
-        text_section.generate_searchable_nodes! unless async
-        iteration += 1
-      end
-    end
-  end
-
   private
-
-  # Checking if ID changed allows us to use this in an after_commit callback
-  # while still returning true on initial create.
-  def should_generate_searchable_nodes?
-    id_previously_changed? || body_json_previously_changed?
-  end
-
-  def destroy_searchable_nodes!
-    ids = searchable_nodes.pluck :id
-    TextSectionJobs::DestroySearchableNodesJob.perform_later ids
-  end
 
   def adopt_or_orphan_annotations!
     return unless body_json_previously_changed?
