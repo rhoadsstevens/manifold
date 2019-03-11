@@ -13,10 +13,11 @@ module Search
       record :text_section
     end
 
-    ALLOWED_FACETS = %w(Project Resource Text SearchableNode Annotation).freeze
+    ALLOWED_FACETS = %w(Project Resource Text TextSection Annotation).freeze
 
     def execute
-      Results.new(Searchkick.search(keyword, search_options))
+      Results.new(text_section_search)
+      # Results.new(Searchkick.search(keyword, search_options))
     end
 
     private
@@ -24,7 +25,7 @@ module Search
     def search_options
       {
         index_name: search_indexes,
-        indices_boost: indices_ranking,
+        # execute: false,
         load: false,
         debug: Rails.env.development?,
         page: page_number,
@@ -35,6 +36,39 @@ module Search
         highlight: highlight_options,
         request_params: { search_type: search_type }
       }
+    end
+
+    def text_section_search
+      options = {
+        index_name: TextSection,
+        debug: true,
+        # execute: false,
+        load: false,
+        body: {
+          query: {
+            nested: {
+              path: "text_nodes",
+              query: {
+                match: { "text_nodes.content": keyword }
+              },
+              inner_hits: {
+                highlight: {
+                  pre_tags: ["<span class=\"highlight\">"],
+                  post_tags: ["</span>"],
+                  fields: {
+                    content: {
+                      fragment_size: 250,
+                      boundary_scanner: "sentence"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          _source: false
+        }
+      }
+      Searchkick.search options
     end
 
     def metadata_fields
@@ -89,7 +123,7 @@ module Search
         Text => 30,
         Resource => 15,
         Annotation => 10,
-        SearchableNode => 1
+        TextSection => 1
       }
     end
 
