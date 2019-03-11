@@ -66,8 +66,16 @@ class TextSection < ApplicationRecord
 
   # Search
   searchkick(
-    callbacks: :async,
-    batch_size: 500
+    # callbacks: :async,
+    # batch_size: 500,
+    merge_mappings: true,
+    mappings: {
+      text_section: {
+        properties: {
+          text_nodes: { type: "nested" }
+        }
+      }
+    }
   )
 
   scope :search_import, lambda {
@@ -86,7 +94,8 @@ class TextSection < ApplicationRecord
       text_id: text.id,
       project_id: text.project_id,
       text_title: text.title,
-      creator_names: text&.makers&.map(&:full_name)
+      creator_names: text&.makers&.map(&:full_name),
+      text_nodes: properties_for_searchable_nodes
     }.merge(search_hidden)
   end
 
@@ -115,7 +124,11 @@ class TextSection < ApplicationRecord
   end
 
   def enqueue_searchable_nodes_generation!
-    TextSectionJobs::GenerateSearchableNodesJob.perform_later id
+    # TextSectionJobs::GenerateSearchableNodesJob.perform_later id
+  end
+
+  def generate_searchable_nodes!
+    # TextSectionJobs::GenerateSearchableNodesJob.perform_now id
   end
 
   # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -170,13 +183,14 @@ class TextSection < ApplicationRecord
   end
 
   class << self
-    def generate_searchable_nodes!(logger = Rails.logger)
+    def generate_searchable_nodes!(logger = Rails.logger, async = true)
       count = TextSection.count
       iteration = 1
       TextSection.find_each do |text_section|
         msg = "Committing searchable text nodes for text section"
         logger.info "#{msg} #{text_section.id}: #{iteration}/#{count}"
-        text_section.enqueue_searchable_nodes_generation!
+        text_section.enqueue_searchable_nodes_generation! if async
+        text_section.generate_searchable_nodes! unless async
         iteration += 1
       end
     end

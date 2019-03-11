@@ -8,7 +8,9 @@ Rails.application.routes.draw do
               controller: "/api/v1/permissions"
   end
 
-  mount Sidekiq::Web => "/sidekiq" if Rails.env.development?
+  # authenticated :user, ->(u) { u.admin? } do
+  # end
+  mount Sidekiq::Web => '/api/sidekiq'
 
   get "auth/:provider/callback", to: "oauth#authorize"
 
