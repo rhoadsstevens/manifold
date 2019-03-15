@@ -39,7 +39,7 @@ module Ingestions
           hash[:ingestion_source] = ingestion_source
           hash[:source_body] = source_body
           hash[:stylesheets] = user_stylesheets + stylesheets
-        end.except(:build, :stylesheet_contents)
+        end.except(:build, :stylesheet_contents, :full_source_identifier)
       end
 
       def source_body

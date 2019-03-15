@@ -19,7 +19,8 @@ module Ingestions
             source_identifier: source_identifier,
             name: name,
             kind: kind,
-            position: @position
+            position: @position,
+            full_source_identifier: Digest::MD5.hexdigest(@source[:source_path])
           }
         end
 
